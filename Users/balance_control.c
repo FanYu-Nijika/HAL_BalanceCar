@@ -22,7 +22,7 @@
  * PWM around 55 is still static, around 60 can start moving.
  */
 #define BALANCE_PWM_LIMIT 90
-#define BALANCE_PWM_START 50
+#define BALANCE_PWM_START 30
 
 /*
  * This is not PWM deadband.
