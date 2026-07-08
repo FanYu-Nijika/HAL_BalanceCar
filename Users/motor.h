@@ -3,7 +3,7 @@
 
 #include "stm32f1xx_hal.h"
 
-#define MOTOR_PWM_MAX 100
+#define MOTOR_PWM_MAX 6900
 
 void motor_init(void);
 void motor_set_left(int pwm);

@@ -49,12 +49,12 @@ int main(void)
         {
             last_display_tick = now_tick;
             OLED_Clear();
-            OLED_ShowFloatNum(0, 0, balance_control_get_angle(), 3, 1, OLED_8X16);
-            OLED_ShowFloatNum(0, 16, balance_control_get_gyro_rate(), 3, 1, OLED_8X16);
-            OLED_ShowSignedNum(0, 32, balance_control_get_pwm(), 3, OLED_8X16);
-            OLED_ShowFloatNum(64, 0, Balance_Kp, 2, 1, OLED_8X16);
-            OLED_ShowFloatNum(64, 16, Balance_Kd, 2, 1, OLED_8X16);
-            OLED_ShowSignedNum(64, 32, balance_control_is_fallen(), 1, OLED_8X16);
+            OLED_Printf(0, 0, OLED_6X8, "A:%d", (int)(balance_control_get_angle() * 10.0f));
+            OLED_Printf(64, 0, OLED_6X8, "G:%d", (int)(balance_control_get_gyro_rate() * 10.0f));
+            OLED_Printf(0, 16, OLED_6X8, "B:%d", balance_control_get_pwm());
+            OLED_Printf(64, 16, OLED_6X8, "F:%d", balance_control_is_fallen());
+            OLED_Printf(0, 32, OLED_6X8, "L:%d", balance_control_get_left_pwm());
+            OLED_Printf(64, 32, OLED_6X8, "R:%d", balance_control_get_right_pwm());
             OLED_Update();
         }
 #else

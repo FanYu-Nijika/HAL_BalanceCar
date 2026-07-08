@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 
-/* 调参入口：角度环 PD，只保留直立控制，速度环和转向环暂时为 0。 */
 extern volatile float Balance_Kp;
 extern volatile float Balance_Kd;
+extern volatile float Velocity_Kp;
+extern volatile float Velocity_Ki;
 extern volatile float Balance_Target_Angle;
 extern volatile float Balance_Target_Offset;
 extern volatile int Balance_Filter_Mode;
@@ -19,6 +20,8 @@ void balance_control_mpu_irq(void);
 float balance_control_get_angle(void);
 float balance_control_get_gyro_rate(void);
 int balance_control_get_pwm(void);
+int balance_control_get_left_pwm(void);
+int balance_control_get_right_pwm(void);
 uint8_t balance_control_is_fallen(void);
 
 #endif

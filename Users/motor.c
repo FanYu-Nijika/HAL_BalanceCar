@@ -1,6 +1,7 @@
 #include "motor.h"
 
-#define MOTOR_PWM_PERIOD 100
+#define MOTOR_PWM_PERIOD 7200
+#define MOTOR_TIMER_PERIOD (MOTOR_PWM_PERIOD - 1)
 
 static TIM_HandleTypeDef g_tim3_pwm_handle;
 
@@ -24,7 +25,7 @@ static uint32_t pwm_to_compare(int pwm)
         pwm = -pwm;
     }
 
-    return (uint32_t)(pwm * MOTOR_PWM_PERIOD / MOTOR_PWM_MAX);
+    return (uint32_t)pwm;
 }
 
 static void motor_gpio_init(void)
@@ -64,9 +65,9 @@ void motor_init(void)
     motor_gpio_init();
 
     g_tim3_pwm_handle.Instance = TIM3;
-    g_tim3_pwm_handle.Init.Prescaler = 71;
+    g_tim3_pwm_handle.Init.Prescaler = 0;
     g_tim3_pwm_handle.Init.CounterMode = TIM_COUNTERMODE_UP;
-    g_tim3_pwm_handle.Init.Period = MOTOR_PWM_PERIOD;
+    g_tim3_pwm_handle.Init.Period = MOTOR_TIMER_PERIOD;
     g_tim3_pwm_handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     HAL_TIM_PWM_Init(&g_tim3_pwm_handle);
 
@@ -87,18 +88,18 @@ void motor_set_left(int pwm)
 
     if (pwm > 0)
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, compare);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, 0);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, MOTOR_PWM_PERIOD);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, MOTOR_PWM_PERIOD - compare);
     }
     else if (pwm < 0)
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, 0);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, compare);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, MOTOR_PWM_PERIOD - compare);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, MOTOR_PWM_PERIOD);
     }
     else
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, 0);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, 0);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, MOTOR_PWM_PERIOD);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, MOTOR_PWM_PERIOD);
     }
 }
 
@@ -111,23 +112,25 @@ void motor_set_right(int pwm)
 
     if (pwm > 0)
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, compare);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, 0);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, MOTOR_PWM_PERIOD - compare);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, MOTOR_PWM_PERIOD);
     }
     else if (pwm < 0)
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, 0);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, compare);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, MOTOR_PWM_PERIOD);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, MOTOR_PWM_PERIOD - compare);
     }
     else
     {
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, 0);
-        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, 0);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, MOTOR_PWM_PERIOD);
+        __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, MOTOR_PWM_PERIOD);
     }
 }
 
 void motor_stop_all(void)
 {
-    motor_set_left(0);
-    motor_set_right(0);
+    __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_1, 0);
+    __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_2, 0);
+    __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_3, 0);
+    __HAL_TIM_SET_COMPARE(&g_tim3_pwm_handle, TIM_CHANNEL_4, 0);
 }

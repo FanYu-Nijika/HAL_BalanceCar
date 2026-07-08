@@ -27,8 +27,32 @@ At `0x080067f2`:
 - `0x0800641e(left_count, right_count)` converts encoder counts to wheel speed.
 - A byte counter at RAM `0x20000015` divides by 10 before calling `0x08002a0a()` and `0x08002baa()`.
 - `0x0800641e` uses a `200.0` double constant before wheel-speed scaling.
+- The main control dispatch around `0x080069c8` calls:
+  - `0x08005ed8(angle, gyro)` for the angle PD output.
+  - `0x08005a5e(left_count, right_count)` for the velocity PI output.
+  - a turn output path, then combines motor outputs as left = balance + velocity + turn and right = balance + velocity - turn.
+  - `0x0800596a` clamps both final motor outputs to approximately `+/-6900`.
 
 Conclusion: the successful firmware runs the fast balance path from PB9 EXTI, not from a main-loop tick poll. The `200.0` speed-scale constant shows the fast loop is 200Hz / 5ms.
+
+## PID and PWM scale
+
+- The scatter-load table at `0x0800f9f8` expands compressed startup data from `0x0800fa18` to RAM `0x20000000`.
+- Decoded startup RAM defaults:
+  - `0x20000080` = `32000.0f` (`Balance_Kp`)
+  - `0x20000084` = `120.0f` (`Balance_Kd`)
+  - `0x20000088` = `410.0f` (`Velocity_Kp`)
+  - `0x2000008c` = `2.0f` (`Velocity_Ki`)
+- `0x08005ed8` divides the angle-loop parameters by `100.0f` before calculating output.
+- `0x08005a5e` uses velocity filtering constants `0.84` and `0.16`, accumulates a velocity integral, and clamps that integral around `+/-380000`.
+- `0x0800043e-0x08000444` initializes the TIM3 PWM path with period `0x1c1f`, while `0x0800572c` writes CCR values around `0x1c20` (`7200`).
+- `0x0800572c` writes TIM3 CCR1-CCR4 directly:
+  - left positive: CCR1 = `7200`, CCR2 = `7200 - output`
+  - left negative: CCR1 = `7200 + output`, CCR2 = `7200`
+  - right positive: CCR3 = `7200 - output`, CCR4 = `7200`
+  - right negative: CCR3 = `7200`, CCR4 = `7200 + output`
+
+Conclusion: the verified firmware uses raw PWM-scale motor output, not a 0-100 percent abstraction. The PID defaults are menu-style values scaled by 100.
 
 ## MPU6050 raw path
 

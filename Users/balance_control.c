@@ -7,8 +7,8 @@
 
 /*
  * firmware_COM4_verify runs the fast balance path from MPU6050 PB9 EXTI.
- * The verified firmware exposes DMP, Kalman and C F modes; this project keeps
- * the angle loop only and defaults to the raw-register Kalman path.
+ * The verified firmware exposes DMP, Kalman and C F modes. This project keeps
+ * the raw-register Kalman path and mirrors the verified cascade PID output.
  */
 #define BALANCE_DT 0.005f
 #define BALANCE_FILTER_ALPHA 0.98f
@@ -21,42 +21,26 @@
 
 #define BALANCE_ZERO_SAMPLES 100
 #define BALANCE_ZERO_MAX_TRIES 240
-#define BALANCE_FALL_ANGLE 35.0f
+#define BALANCE_FALL_ANGLE 40.0f
+
+#define BALANCE_PARAM_SCALE 100.0f
+#define SPEED_FILTER_KEEP 0.84f
+#define SPEED_FILTER_NEW 0.16f
+#define SPEED_INTEGRAL_LIMIT 380000.0f
 
 /*
- * Your motor dead zone:
- * PWM around 55 is still static, around 60 can start moving.
+ * firmware_COM4_verify startup RAM defaults:
+ * 0x20000080 = 32000.0f, 0x20000084 = 120.0f,
+ * 0x20000088 = 410.0f,   0x2000008c = 2.0f.
+ * The firmware divides these menu-style parameters by 100 in the PID formula.
  */
-#define BALANCE_PWM_LIMIT 70
-#define BALANCE_PWM_START 40
+volatile float Balance_Kp = 32000.0f;
+volatile float Balance_Kd = 120.0f;
+volatile float Velocity_Kp = 410.0f;
+volatile float Velocity_Ki = 2.0f;
 
-/*
- * This is not PWM deadband.
- * It is the zero area of the raw PD output.
- *
- * If the raw PD output is too small, treat it as noise and output 0.
- * Once it exceeds this threshold, jump over motor static friction
- * and start from BALANCE_PWM_START.
- */
-#define BALANCE_OUTPUT_ZERO 4.0f
-#define BALANCE_PWM_SCALE 0.8f
-
-/*
- * Tuning entry.
- *
- * Suggested starting point:
- * - If the car is soft and falls slowly: increase Balance_Kp.
- * - If the car swings back and forth: increase Balance_Kd.
- * - If the car shakes quickly: decrease Balance_Kd.
- */
-volatile float Balance_Kp = 4.0f;
-volatile float Balance_Kd = 0.35f;
-
-/*
- * Automatically calibrated during boot.
- * Hold the car at its real mechanical balance point when powering on.
- */
-volatile float Balance_Target_Angle = 1.0f;
+/* Verified firmware default target angle is 0. Use offset for mechanical trim. */
+volatile float Balance_Target_Angle = 0.0f;
 
 /*
  * Manual fine tuning for mechanical balance point.
@@ -75,9 +59,9 @@ volatile int Balance_Filter_Mode = BALANCE_FILTER_KALMAN;
  * If the whole direction is opposite, change Balance_Output_Dir.
  * If only one wheel is opposite, change the corresponding motor dir.
  */
-volatile int Balance_Output_Dir = -1;
+volatile int Balance_Output_Dir = 1;
 volatile int Balance_Left_Motor_Dir = 1;
-volatile int Balance_Right_Motor_Dir = -1;
+volatile int Balance_Right_Motor_Dir = 1;
 
 static float g_balance_angle = 0.0f;
 static float g_accel_angle = 0.0f;
@@ -88,8 +72,14 @@ static float g_kalman_p00 = 0.0f;
 static float g_kalman_p01 = 0.0f;
 static float g_kalman_p10 = 0.0f;
 static float g_kalman_p11 = 0.0f;
+static float g_speed_filter = 0.0f;
+static float g_speed_integral = 0.0f;
 
 static int g_balance_pwm = 0;
+static int g_velocity_pwm = 0;
+static int g_turn_pwm = 0;
+static int g_left_pwm = 0;
+static int g_right_pwm = 0;
 static int g_left_encoder_count = 0;
 static int g_right_encoder_count = 0;
 static uint8_t g_is_fallen = 1;
@@ -119,49 +109,28 @@ static int limit_int(int value, int limit)
     return value;
 }
 
-/*
- * Convert raw PD output to motor PWM.
- *
- * Example:
- * raw output < 4      -> PWM 0
- * raw output around 4 -> PWM 60
- * raw output larger   -> PWM gradually increases to 90
- *
- * This avoids wasting control output in the motor dead zone.
- */
-static int float_to_pwm(float value)
+static float limit_float(float value, float limit)
 {
-    int sign;
-    int pwm;
-    float abs_value;
-
-    if (value > -BALANCE_OUTPUT_ZERO && value < BALANCE_OUTPUT_ZERO)
+    if (value > limit)
     {
-        return 0;
+        return limit;
     }
 
-    if (value > 0.0f)
+    if (value < -limit)
     {
-        sign = 1;
-        abs_value = value;
-    }
-    else
-    {
-        sign = -1;
-        abs_value = -value;
+        return -limit;
     }
 
-    pwm = BALANCE_PWM_START
-        + (int)((abs_value - BALANCE_OUTPUT_ZERO) * BALANCE_PWM_SCALE + 0.5f);
-
-    pwm = limit_int(pwm, BALANCE_PWM_LIMIT);
-
-    return sign * pwm;
+    return value;
 }
 
 static void balance_stop(void)
 {
     g_balance_pwm = 0;
+    g_velocity_pwm = 0;
+    g_turn_pwm = 0;
+    g_left_pwm = 0;
+    g_right_pwm = 0;
     motor_stop_all();
 }
 
@@ -242,16 +211,14 @@ static void balance_calibrate_zero_angle(void)
 
     if (samples > 0)
     {
-        Balance_Target_Angle = angle_sum / (float)samples;
         g_gyro_zero_rate = gyro_sum / (float)samples;
+        balance_filter_reset(angle_sum / (float)samples);
     }
     else
     {
-        Balance_Target_Angle = 0.0f;
         g_gyro_zero_rate = 0.0f;
+        balance_filter_reset(Balance_Target_Angle);
     }
-
-    balance_filter_reset(Balance_Target_Angle);
 }
 
 void balance_control_init(void)
@@ -279,8 +246,10 @@ void balance_control_update(void)
 {
     mpu6050_fast_data_t data;
     float target_angle;
-    float angle_error;
-    float raw_output;
+    float angle_output;
+    float speed_least;
+    int final_left;
+    int final_right;
 
     /*
      * firmware_COM4_verify reads and clears TIM4 first, then TIM8 and negates it
@@ -322,22 +291,26 @@ void balance_control_update(void)
 
     g_is_fallen = 0;
 
-    /*
-     * Angle loop PD:
-     *
-     * P term:
-     *   angle_error = target - actual
-     *
-     * D term:
-     *   gyro rate is used as angular velocity feedback.
-     */
-    angle_error = target_angle - g_balance_angle;
-    raw_output = Balance_Kp * angle_error - Balance_Kd * g_balance_gyro_rate;
+    angle_output = (g_balance_angle - target_angle) * (Balance_Kp / BALANCE_PARAM_SCALE)
+                 + g_balance_gyro_rate * (Balance_Kd / BALANCE_PARAM_SCALE);
+    g_balance_pwm = (int)(angle_output * (float)Balance_Output_Dir);
 
-    g_balance_pwm = float_to_pwm(raw_output * (float)Balance_Output_Dir);
+    speed_least = -(float)(g_left_encoder_count + g_right_encoder_count);
+    g_speed_filter = g_speed_filter * SPEED_FILTER_KEEP + speed_least * SPEED_FILTER_NEW;
+    g_speed_integral += g_speed_filter;
+    g_speed_integral = limit_float(g_speed_integral, SPEED_INTEGRAL_LIMIT);
 
-    motor_set_left(g_balance_pwm * Balance_Left_Motor_Dir);
-    motor_set_right(g_balance_pwm * Balance_Right_Motor_Dir);
+    g_velocity_pwm = (int)(g_speed_filter * (Velocity_Kp / BALANCE_PARAM_SCALE)
+                         + g_speed_integral * (Velocity_Ki / BALANCE_PARAM_SCALE));
+    g_turn_pwm = 0;
+
+    final_left = g_balance_pwm + g_velocity_pwm + g_turn_pwm;
+    final_right = g_balance_pwm + g_velocity_pwm - g_turn_pwm;
+    g_left_pwm = limit_int(final_left, MOTOR_PWM_MAX);
+    g_right_pwm = limit_int(final_right, MOTOR_PWM_MAX);
+
+    motor_set_left(g_left_pwm * Balance_Left_Motor_Dir);
+    motor_set_right(g_right_pwm * Balance_Right_Motor_Dir);
 }
 
 void balance_control_mpu_irq(void)
@@ -358,6 +331,16 @@ float balance_control_get_gyro_rate(void)
 int balance_control_get_pwm(void)
 {
     return g_balance_pwm;
+}
+
+int balance_control_get_left_pwm(void)
+{
+    return g_left_pwm;
+}
+
+int balance_control_get_right_pwm(void)
+{
+    return g_right_pwm;
 }
 
 uint8_t balance_control_is_fallen(void)
