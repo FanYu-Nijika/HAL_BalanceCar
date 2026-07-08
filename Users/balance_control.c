@@ -10,7 +10,7 @@
  * The verified firmware exposes DMP, Kalman and C F modes; this project keeps
  * the angle loop only and defaults to the raw-register Kalman path.
  */
-#define BALANCE_DT 0.01f
+#define BALANCE_DT 0.005f
 #define BALANCE_FILTER_ALPHA 0.98f
 #define BALANCE_FILTER_KALMAN 2
 #define BALANCE_FILTER_COMPLEMENTARY 3

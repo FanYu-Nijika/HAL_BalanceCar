@@ -64,8 +64,8 @@ int mpu6050_fast_init(void)
     i2cWrite(MPU6050_ADDR, MPU6050_PWR_MGMT_1, 0x01);
     i2cWrite(MPU6050_ADDR, MPU6050_PWR_MGMT_2, 0x00);
 
-    /* The verified firmware runs the balance path from MPU data-ready EXTI at 100Hz. */
-    i2cWrite(MPU6050_ADDR, MPU6050_SMPLRT_DIV, 0x09);
+    /* firmware_COM4_verify uses a 200.0 speed-scale constant in the fast loop. */
+    i2cWrite(MPU6050_ADDR, MPU6050_SMPLRT_DIV, 0x04);
     i2cWrite(MPU6050_ADDR, MPU6050_CONFIG, 0x03);
 
     /* Gyro +/-2000dps -> 16.4 LSB/(deg/s), accel +/-4g -> 8192 LSB/g. */

@@ -24,10 +24,11 @@ At `0x080067f2`:
 - `0x080037e4(8)` reads and clears TIM8 counter, negated and stored at RAM `0x2000004c`.
 - `0x08006580(mode)` updates MPU attitude/control state. `mode` is loaded from RAM `0x2000001c`.
 - `0x08002e8a()` runs an auxiliary periodic task.
-- `0x0800641e(left_count, right_count)` applies motor output/mixing.
+- `0x0800641e(left_count, right_count)` converts encoder counts to wheel speed.
 - A byte counter at RAM `0x20000015` divides by 10 before calling `0x08002a0a()` and `0x08002baa()`.
+- `0x0800641e` uses a `200.0` double constant before wheel-speed scaling.
 
-Conclusion: the successful firmware runs the fast balance path from PB9 EXTI, not from a main-loop tick poll.
+Conclusion: the successful firmware runs the fast balance path from PB9 EXTI, not from a main-loop tick poll. The `200.0` speed-scale constant shows the fast loop is 200Hz / 5ms.
 
 ## MPU6050 raw path
 
