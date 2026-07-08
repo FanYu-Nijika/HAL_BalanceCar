@@ -32,9 +32,9 @@ int main(void)
             OLED_ShowFloatNum(0, 0, fAX, 3, 2, OLED_8X16);
             OLED_ShowFloatNum(0, 16, fAY, 3, 2, OLED_8X16);
             OLED_ShowFloatNum(0, 32, fAZ, 3, 2, OLED_8X16);
-            OLED_ShowSignedNum(64, 0, mpu.gx, 5, OLED_8X16);
-            OLED_ShowSignedNum(64, 16, mpu.gy, 5, OLED_8X16);
-            OLED_ShowSignedNum(64, 32, mpu.gz, 5, OLED_8X16);
+            OLED_ShowSignedNum(64, 0, mpu.ax, 5, OLED_8X16);
+            OLED_ShowSignedNum(64, 16, mpu.ay, 5, OLED_8X16);
+            OLED_ShowSignedNum(64, 32, mpu.az, 5, OLED_8X16);
         }
         OLED_Update();
         delay_ms(20);

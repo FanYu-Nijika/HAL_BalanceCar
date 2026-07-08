@@ -201,7 +201,7 @@ int MPU_init(void)
 	return 1;
 }
 
-void MPU_getdata(void)
+int MPU_getdata(void)
 {
 	unsigned long sensor_timestamp;
 	short gyro[3], accel[3], sensors;
@@ -218,7 +218,7 @@ void MPU_getdata(void)
 		if (fail_cnt <= 3 || fail_cnt % 100 == 0)
 			printf("[DIAG] dmp_read_fifo fail #%u (ret=%d, sensors=0x%04X)\r\n",
 			       (unsigned int)fail_cnt, dmp_ret, sensors);
-		return;
+		return 0;
 	}
 	ok_cnt++;
 	if (ok_cnt <= 3)
@@ -248,6 +248,8 @@ void MPU_getdata(void)
 		 ay = accel[1];
 		 az = accel[2];
 	 }
+
+	return 1;
 }
 
 void MPU6050_ReturnTemp(float*Temperature)
@@ -289,7 +291,8 @@ int mpu6050_read_data(mpu6050_data_t *data)
     call_cnt++;
     if (!data)
         return 0;
-    MPU_getdata();
+    if (!MPU_getdata())
+        return 0;
     data->ax = ax;
     data->ay = ay;
     data->az = az;

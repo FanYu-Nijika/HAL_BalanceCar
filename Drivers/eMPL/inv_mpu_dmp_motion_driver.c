@@ -1292,6 +1292,7 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
         quat[3] = ((long)fifo_data[12] << 24) | ((long)fifo_data[13] << 16) |
             ((long)fifo_data[14] << 8) | fifo_data[15];
         ii += 16;
+        sensors[0] |= INV_WXYZ_QUAT;
 #ifdef FIFO_CORRUPTION_CHECK
         /* We can detect a corrupted FIFO by monitoring the quaternion data and
          * ensuring that the magnitude is always normalized to one. This
@@ -1314,7 +1315,6 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
             sensors[0] = 0;
             return -1;
         }
-        sensors[0] |= INV_WXYZ_QUAT;
 #endif
     }
 
