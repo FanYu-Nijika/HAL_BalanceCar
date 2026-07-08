@@ -5,13 +5,18 @@
 #include <stdio.h>
 
 /*
- * Angle loop only:
- * - speed loop disabled
- * - turn loop disabled
- * - control period should be 5 ms in main.c
+ * firmware_COM4_verify runs the fast balance path from MPU6050 PB9 EXTI.
+ * The verified firmware exposes DMP, Kalman and C F modes; this project keeps
+ * the angle loop only and defaults to the raw-register Kalman path.
  */
-#define BALANCE_DT 0.005f
+#define BALANCE_DT 0.01f
 #define BALANCE_FILTER_ALPHA 0.98f
+#define BALANCE_FILTER_KALMAN 2
+#define BALANCE_FILTER_COMPLEMENTARY 3
+
+#define BALANCE_KALMAN_Q_ANGLE 0.001f
+#define BALANCE_KALMAN_Q_BIAS 0.003f
+#define BALANCE_KALMAN_R_MEASURE 0.02f
 
 #define BALANCE_ZERO_SAMPLES 100
 #define BALANCE_ZERO_MAX_TRIES 240
@@ -58,6 +63,7 @@ volatile float Balance_Target_Angle = 1.0f;
  * toward the same direction.
  */
 volatile float Balance_Target_Offset = 0.0f;
+volatile int Balance_Filter_Mode = BALANCE_FILTER_KALMAN;
 
 /*
  * Direction tuning.
@@ -76,6 +82,11 @@ static float g_balance_angle = 0.0f;
 static float g_accel_angle = 0.0f;
 static float g_balance_gyro_rate = 0.0f;
 static float g_gyro_zero_rate = 0.0f;
+static float g_kalman_bias = 0.0f;
+static float g_kalman_p00 = 0.0f;
+static float g_kalman_p01 = 0.0f;
+static float g_kalman_p10 = 0.0f;
+static float g_kalman_p11 = 0.0f;
 
 static int g_balance_pwm = 0;
 static uint8_t g_is_fallen = 1;
@@ -151,6 +162,59 @@ static void balance_stop(void)
     motor_stop_all();
 }
 
+static void balance_filter_reset(float angle)
+{
+    g_balance_angle = angle;
+    g_accel_angle = angle;
+    g_balance_gyro_rate = 0.0f;
+    g_kalman_bias = 0.0f;
+    g_kalman_p00 = 0.0f;
+    g_kalman_p01 = 0.0f;
+    g_kalman_p10 = 0.0f;
+    g_kalman_p11 = 0.0f;
+}
+
+static float balance_kalman_update(float accel_angle, float gyro_rate)
+{
+    float rate;
+    float p00_temp;
+    float p01_temp;
+    float s;
+    float k0;
+    float k1;
+    float y;
+
+    rate = gyro_rate - g_kalman_bias;
+    g_balance_angle += BALANCE_DT * rate;
+
+    g_kalman_p00 += BALANCE_DT * (BALANCE_DT * g_kalman_p11 - g_kalman_p01 - g_kalman_p10 + BALANCE_KALMAN_Q_ANGLE);
+    g_kalman_p01 -= BALANCE_DT * g_kalman_p11;
+    g_kalman_p10 -= BALANCE_DT * g_kalman_p11;
+    g_kalman_p11 += BALANCE_KALMAN_Q_BIAS * BALANCE_DT;
+
+    s = g_kalman_p00 + BALANCE_KALMAN_R_MEASURE;
+    if (s == 0.0f)
+    {
+        return g_balance_angle;
+    }
+
+    k0 = g_kalman_p00 / s;
+    k1 = g_kalman_p10 / s;
+    y = accel_angle - g_balance_angle;
+
+    g_balance_angle += k0 * y;
+    g_kalman_bias += k1 * y;
+
+    p00_temp = g_kalman_p00;
+    p01_temp = g_kalman_p01;
+    g_kalman_p00 -= k0 * p00_temp;
+    g_kalman_p01 -= k0 * p01_temp;
+    g_kalman_p10 -= k1 * p00_temp;
+    g_kalman_p11 -= k1 * p01_temp;
+
+    return g_balance_angle;
+}
+
 static void balance_calibrate_zero_angle(void)
 {
     mpu6050_fast_data_t data;
@@ -184,9 +248,7 @@ static void balance_calibrate_zero_angle(void)
         g_gyro_zero_rate = 0.0f;
     }
 
-    g_balance_angle = Balance_Target_Angle;
-    g_accel_angle = Balance_Target_Angle;
-    g_balance_gyro_rate = 0.0f;
+    balance_filter_reset(Balance_Target_Angle);
 }
 
 void balance_control_init(void)
@@ -228,9 +290,16 @@ void balance_control_update(void)
     g_accel_angle = mpu6050_fast_get_pitch_accel(&data);
     g_balance_gyro_rate = mpu6050_fast_get_pitch_gyro_rate(&data) - g_gyro_zero_rate;
 
-    g_balance_angle = BALANCE_FILTER_ALPHA
-                    * (g_balance_angle + g_balance_gyro_rate * BALANCE_DT)
-                    + (1.0f - BALANCE_FILTER_ALPHA) * g_accel_angle;
+    if (Balance_Filter_Mode == BALANCE_FILTER_KALMAN)
+    {
+        g_balance_angle = balance_kalman_update(g_accel_angle, g_balance_gyro_rate);
+    }
+    else
+    {
+        g_balance_angle = BALANCE_FILTER_ALPHA
+                        * (g_balance_angle + g_balance_gyro_rate * BALANCE_DT)
+                        + (1.0f - BALANCE_FILTER_ALPHA) * g_accel_angle;
+    }
 
     target_angle = Balance_Target_Angle + Balance_Target_Offset;
 
