@@ -65,6 +65,7 @@ project:
         - file: ../../Users/stm32f1xx_it.c
         - file: ../../Users/main.c
         - file: ../../Users/balance_control.c
+        - file: ../../Users/mpu6050_fast.c
         - file: ../../Users/motor.c
         - file: ../../Users/encoder.c
         - file: ../../Users/experiment.c

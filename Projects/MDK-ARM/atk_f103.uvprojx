@@ -431,6 +431,11 @@
               <FilePath>..\..\Users\balance_control.c</FilePath>
             </File>
             <File>
+              <FileName>mpu6050_fast.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Users\mpu6050_fast.c</FilePath>
+            </File>
+            <File>
               <FileName>encoder.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\Users\encoder.h</FilePath>
@@ -474,6 +479,11 @@
               <FileName>balance_control.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\Users\balance_control.h</FilePath>
+            </File>
+            <File>
+              <FileName>mpu6050_fast.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\mpu6050_fast.h</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_conf.h</FileName>

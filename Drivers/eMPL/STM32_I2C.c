@@ -4,18 +4,18 @@
 #define PIN_SDA		I2C_SDA_Pin
 #define I2C_GPIO	I2C_SCL_GPIO_Port
 
-#define SCL_H         HAL_GPIO_WritePin(I2C_GPIO,PIN_SCL,GPIO_PIN_SET)
-#define SCL_L         HAL_GPIO_WritePin(I2C_GPIO, PIN_SCL,GPIO_PIN_RESET)
+#define SCL_H         (I2C_GPIO->BSRR = PIN_SCL)
+#define SCL_L         (I2C_GPIO->BRR = PIN_SCL)
 
-#define SDA_H         HAL_GPIO_WritePin(I2C_GPIO, PIN_SDA,GPIO_PIN_SET)
-#define SDA_L         HAL_GPIO_WritePin(I2C_GPIO, PIN_SDA,GPIO_PIN_RESET)
+#define SDA_H         (I2C_GPIO->BSRR = PIN_SDA)
+#define SDA_L         (I2C_GPIO->BRR = PIN_SDA)
 
-#define SCL_read      HAL_GPIO_ReadPin(I2C_GPIO, PIN_SCL)
-#define SDA_read      HAL_GPIO_ReadPin(I2C_GPIO, PIN_SDA)
+#define SCL_read      ((I2C_GPIO->IDR & PIN_SCL) ? GPIO_PIN_SET : GPIO_PIN_RESET)
+#define SDA_read      ((I2C_GPIO->IDR & PIN_SDA) ? GPIO_PIN_SET : GPIO_PIN_RESET)
 
 static void I2C_delay(void)
 {
-    volatile int i = 30;
+    volatile int i = 12;
     while (i)
         i--;
 }
@@ -134,7 +134,7 @@ void i2cInit(void)
     gpio.Pin   = PIN_SCL | PIN_SDA;
     gpio.Mode  = GPIO_MODE_OUTPUT_OD;
     gpio.Pull  = GPIO_PULLUP;
-    gpio.Speed = GPIO_SPEED_FREQ_MEDIUM;
+    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(I2C_GPIO, &gpio);
 }
 

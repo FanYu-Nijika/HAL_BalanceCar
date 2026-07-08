@@ -16,9 +16,11 @@ Only the angle loop PD is enabled.
 - Speed loop: disabled.
 - Turn loop: disabled.
 - Encoder feedback: initialized, but not used by the current angle-loop-only tuning.
-- Control period: 10 ms, matching current eMPL DMP output rate of 100 Hz.
-- OLED display period: 100 ms, separated from the control loop so screen refresh does not slow motor response.
-- Balance angle source: complementary filter, using gyro integration for short-term response and accelerometer pitch for long-term correction.
+- Control period: 5 ms, using direct MPU6050 raw-register reads at 200 Hz.
+- Real-time standing build: OLED debug refresh is disabled by default because software SPI screen updates block the main loop.
+- Balance angle source: complementary filter, using raw gyro integration for short-term response and raw accelerometer pitch for long-term correction.
+- MPU6050 path: `Users/mpu6050_fast.c`, bypassing DMP firmware load and FIFO reads for lower latency.
+- Software I2C path: direct GPIO register access with a short bit delay, replacing the slower HAL GPIO calls in the MPU read hot path.
 
 ## Tuning Entry
 
@@ -33,10 +35,28 @@ volatile int Balance_Left_Motor_Dir = 1;
 volatile int Balance_Right_Motor_Dir = -1;
 ```
 
-Display meanings on OLED:
+Current code is left at a tentative first standing value:
+
+```c
+volatile float Balance_Kp = 5.0f;
+volatile float Balance_Kd = 0.5f;
+volatile int Balance_Output_Dir = -1;
+```
+
+The current minimum non-zero motor command is `15`, because lower PWM values can
+fail to overcome motor static friction and make the car look unresponsive.
+
+For a direction check, temporarily set `Balance_Kp = 2.0f` and `Balance_Kd = 0.0f`
+with the wheels lifted.
+
+For real-time standing, `BALANCE_OLED_DEBUG` in `Users/main.c` is `0` by default.
+Set it to `1` only while checking numbers with the wheels lifted, because OLED refresh
+is blocking and can make the control reaction visibly slower.
+
+Display meanings on OLED when debug is enabled:
 
 - Left top: fused angle, from gyro integration plus accelerometer pitch correction.
-- Left middle: gyro rate, from `mpu6050_get_pitch_gyro_rate()`.
+- Left middle: zero-biased gyro rate, from `mpu6050_fast_get_pitch_gyro_rate()`.
 - Left bottom: output PWM.
 - Right top: `Balance_Kp`.
 - Right middle: `Balance_Kd`.
@@ -44,7 +64,8 @@ Display meanings on OLED:
 
 `Balance_Target_Angle` is automatically calibrated during `balance_control_init()`.
 Hold the car at the real mechanical balance point during boot. The firmware averages
-50 accelerometer-angle samples and uses that average as the stable upright angle.
+100 accelerometer-angle samples and gyro-rate samples, then uses those averages as
+the stable upright angle and gyro zero offset.
 
 ## Safety Procedure
 
