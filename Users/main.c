@@ -12,26 +12,32 @@ void led_init(void);
 
 int main(void)
 {
+    mpu6050_data_t mpu;
+
     HAL_Init();
-    OLED_Init();
     sys_stm32_clock_init(RCC_PLL_MUL9);
     delay_init(72);
     usart_init(115200);
     led_init();
+    OLED_Init();
     motor_init();
     encoder_init();
-    MPU_init();
+    mpu6050_init();
+
     while (1)
     {
         OLED_Clear();
-        OLED_ShowFloatNum(0, 0, fAX, 3, 2);
-        OLED_ShowFloatNum(0, 16, fAY, 3, 2);
-        OLED_ShowFloatNum(0, 32, fAZ, 3, 2);
-        OLED_ShowFloatNum(64, 0, fAX, 3, 2);
-        OLED_ShowFloatNum(64, 16, fAY, 3, 2);
-        OLED_ShowFloatNum(64, 32, fAZ, 3, 2);
+        if (mpu6050_read_data(&mpu))
+        {
+            OLED_ShowFloatNum(0, 0, fAX, 3, 2, OLED_8X16);
+            OLED_ShowFloatNum(0, 16, fAY, 3, 2, OLED_8X16);
+            OLED_ShowFloatNum(0, 32, fAZ, 3, 2, OLED_8X16);
+            OLED_ShowSignedNum(64, 0, mpu.gx, 5, OLED_8X16);
+            OLED_ShowSignedNum(64, 16, mpu.gy, 5, OLED_8X16);
+            OLED_ShowSignedNum(64, 32, mpu.gz, 5, OLED_8X16);
+        }
         OLED_Update();
-        delay_ms(10);
+        delay_ms(20);
     }
 }
 
