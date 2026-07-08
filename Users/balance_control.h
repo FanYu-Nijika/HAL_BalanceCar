@@ -15,6 +15,8 @@ extern volatile int Balance_Left_Motor_Dir;
 extern volatile int Balance_Right_Motor_Dir;
 
 void balance_control_init(void);
+void balance_control_start(void);
+void balance_control_stop(void);
 void balance_control_update(void);
 void balance_control_mpu_irq(void);
 float balance_control_get_angle(void);
