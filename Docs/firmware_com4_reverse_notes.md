@@ -1,0 +1,70 @@
+# firmware_COM4_verify reverse notes
+
+Source files:
+
+- `C:/Users/34494/Desktop/firmware_COM4_verify.bin`
+- `C:/Users/34494/Documents/Codex/2026-07-08/jiang/outputs/firmware_COM4_verify.hex`
+
+Important addresses are from the verified firmware image base `0x08000000`.
+
+## Interrupt structure
+
+- Vector table entry 39 points to `0x080067f2`. On STM32F103 this is `EXTI9_5_IRQHandler`.
+- `0x080067f2` first reads bit-band alias `0x42218124`.
+- `0x42218124` maps to GPIOB IDR bit 9, so the handler only runs when PB9 is low.
+- The handler writes `0x200` to `0x40010414`, clearing EXTI pending bit 9.
+
+Conclusion: MPU6050 INT is PB9 and is handled as active-low/falling-edge.
+
+## Control ISR flow
+
+At `0x080067f2`:
+
+- `0x080037e4(4)` reads and clears TIM4 counter, stored at RAM `0x20000048`.
+- `0x080037e4(8)` reads and clears TIM8 counter, negated and stored at RAM `0x2000004c`.
+- `0x08006580(mode)` updates MPU attitude/control state. `mode` is loaded from RAM `0x2000001c`.
+- `0x08002e8a()` runs an auxiliary periodic task.
+- `0x0800641e(left_count, right_count)` applies motor output/mixing.
+- A byte counter at RAM `0x20000015` divides by 10 before calling `0x08002a0a()` and `0x08002baa()`.
+
+Conclusion: the successful firmware runs the fast balance path from PB9 EXTI, not from a main-loop tick poll.
+
+## MPU6050 raw path
+
+Inside `0x08006580`:
+
+- If `mode == 1`, the firmware calls DMP/eMPL routines.
+- Otherwise it reads raw MPU6050 registers through function `0x08003bc2(device, reg)`.
+- Device address passed is `0xd0`, the 8-bit write address for MPU6050 address `0x68`.
+- Raw register pairs read:
+  - `0x3b/0x3c`
+  - `0x3d/0x3e`
+  - `0x3f/0x40`
+  - `0x43/0x44`
+  - `0x45/0x46`
+  - `0x47/0x48`
+- The firmware uses float math and stores computed attitude values in RAM around `0x20000060`, `0x20000064`, `0x20000068`, and `0x20000078`.
+
+Conclusion: a direct raw-register MPU6050 path is valid, but it must be synchronized by PB9 data-ready interrupt.
+
+## Filter constants found in firmware
+
+The Kalman/filter section around `0x0800779c` includes:
+
+- `0x3a83126f` = `0.001f`
+- `0x3b449ba6` = `0.003f`
+- `0x3ca3d70a` = `0.02f`
+
+Conclusion: the verified firmware uses small Kalman/process-noise constants and a 0.02-style blend/step constant in its attitude filtering code.
+
+## UART/menu strings
+
+The firmware contains these strings near `0x08006f2c`:
+
+- `DMP`
+- `Kalman`
+- `C F`
+- `Angle`
+- `Gyrox`
+
+Conclusion: the original firmware exposes DMP, Kalman, complementary-filter, angle, and gyro-rate diagnostics. The current project should keep the angle-control entry simple but use a filter structure that matches this behavior.
