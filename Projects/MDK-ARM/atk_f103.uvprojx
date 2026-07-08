@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xE</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\Drivers\CMSIS\Device\ST\STM32F1xx\Include;..\..\Drivers\STM32F1xx_HAL_Driver\Inc;..\..\Drivers\CMSIS\Include;..\..\Drivers;..\..\Users</IncludePath>
+              <IncludePath>..\..\Drivers\CMSIS\Device\ST\STM32F1xx\Include;..\..\Drivers\STM32F1xx_HAL_Driver\Inc;..\..\Drivers\CMSIS\Include;..\..\Drivers;..\..\Users;..\..\Drivers\eMPL</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -425,6 +425,56 @@
               <FileType>1</FileType>
               <FilePath>..\..\Users\speed_pi.c</FilePath>
             </File>
+            <File>
+              <FileName>encoder.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\encoder.h</FilePath>
+            </File>
+            <File>
+              <FileName>experiment.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\experiment.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\motor.h</FilePath>
+            </File>
+            <File>
+              <FileName>OLED.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Users\OLED.c</FilePath>
+            </File>
+            <File>
+              <FileName>OLED.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\OLED.h</FilePath>
+            </File>
+            <File>
+              <FileName>OLED_Data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Users\OLED_Data.c</FilePath>
+            </File>
+            <File>
+              <FileName>OLED_Data.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\OLED_Data.h</FilePath>
+            </File>
+            <File>
+              <FileName>speed_pi.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\speed_pi.h</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_conf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\stm32f1xx_hal_conf.h</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_it.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\stm32f1xx_it.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -444,6 +494,31 @@
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\SYSTEM\usart\usart.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Drivers/eMPL</GroupName>
+          <Files>
+            <File>
+              <FileName>inv_mpu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\eMPL\inv_mpu.c</FilePath>
+            </File>
+            <File>
+              <FileName>inv_mpu_dmp_motion_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\eMPL\inv_mpu_dmp_motion_driver.c</FilePath>
+            </File>
+            <File>
+              <FileName>MPU6050.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\eMPL\MPU6050.c</FilePath>
+            </File>
+            <File>
+              <FileName>STM32_I2C.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\eMPL\STM32_I2C.c</FilePath>
             </File>
           </Files>
         </Group>
