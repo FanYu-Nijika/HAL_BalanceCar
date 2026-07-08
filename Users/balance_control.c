@@ -1,4 +1,5 @@
 #include "balance_control.h"
+#include "encoder.h"
 #include "motor.h"
 #include "mpu6050_fast.h"
 #include "stm32f1xx_hal.h"
@@ -89,6 +90,8 @@ static float g_kalman_p10 = 0.0f;
 static float g_kalman_p11 = 0.0f;
 
 static int g_balance_pwm = 0;
+static int g_left_encoder_count = 0;
+static int g_right_encoder_count = 0;
 static uint8_t g_is_fallen = 1;
 
 static float abs_float(float value)
@@ -278,6 +281,13 @@ void balance_control_update(void)
     float target_angle;
     float angle_error;
     float raw_output;
+
+    /*
+     * firmware_COM4_verify reads and clears TIM4 first, then TIM8 and negates it
+     * at the start of the PB9 EXTI handler before attitude/control calculation.
+     */
+    g_left_encoder_count = encoder_read_left_count();
+    g_right_encoder_count = -encoder_read_right_count();
 
     if (!mpu6050_fast_read(&data))
     {
