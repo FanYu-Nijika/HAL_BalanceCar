@@ -3,7 +3,6 @@
 #include "motor.h"
 #include "mpu6050_fast.h"
 #include "stm32f1xx_hal.h"
-#include <stdio.h>
 
 /*
  * Verified firmware architecture from COM4/hex reverse notes:
@@ -17,7 +16,7 @@
  *       -> left/right PWM mix and limit
  *
  * The controller starts automatically after balance_control_init(). It does not
- * wait for a serial "init" command; the serial port is only for logs/debugging.
+ * wait for a serial "init" command; the serial port is only for manual debugging.
  */
 #define BALANCE_DT 0.005f
 #define BALANCE_AUTO_START 1
@@ -412,16 +411,11 @@ void balance_control_init(void)
         g_balance.enabled = 1;
         g_balance.is_fallen = 0;
 #endif
-
-        printf("[BAL] auto start, target_x100=%d, gyro_zero_x100=%d\r\n",
-               (int)(Balance_Target_Angle * 100.0f),
-               (int)(g_balance.gyro_zero_rate * 100.0f));
     }
     else
     {
         g_balance.enabled = 0;
         g_balance.is_fallen = 1;
-        printf("[BAL] MPU6050 fast init failed, motor stopped\r\n");
     }
 }
 
