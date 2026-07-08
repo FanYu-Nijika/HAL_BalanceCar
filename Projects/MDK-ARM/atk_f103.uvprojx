@@ -426,6 +426,11 @@
               <FilePath>..\..\Users\speed_pi.c</FilePath>
             </File>
             <File>
+              <FileName>balance_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Users\balance_control.c</FilePath>
+            </File>
+            <File>
               <FileName>encoder.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\Users\encoder.h</FilePath>
@@ -464,6 +469,11 @@
               <FileName>speed_pi.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\Users\speed_pi.h</FilePath>
+            </File>
+            <File>
+              <FileName>balance_control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\Users\balance_control.h</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_conf.h</FileName>

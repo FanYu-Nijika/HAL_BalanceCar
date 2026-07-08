@@ -9,6 +9,7 @@ project:
         - ../../Drivers/CMSIS/Include
         - ../../Drivers
         - ../../Users
+        - ../../Drivers/eMPL
       debug: "on"
       define:
         - USE_HAL_DRIVER
@@ -64,16 +65,22 @@ project:
         - file: ../../Users/stm32f1xx_it.c
         - file: ../../Users/main.c
         - file: ../../Users/balance_control.c
-        - file: ../../Users/kalman.c
-        - file: ../../Users/mpu6050.c
-        - file: ../../Users/pid.c
         - file: ../../Users/motor.c
+        - file: ../../Users/encoder.c
+        - file: ../../Users/experiment.c
+        - file: ../../Users/speed_pi.c
         - file: ../../Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
     - group: Drivers/SYSTEM
       files:
         - file: ../../Drivers/SYSTEM/sys/sys.c
         - file: ../../Drivers/SYSTEM/delay/delay.c
         - file: ../../Drivers/SYSTEM/usart/usart.c
+    - group: Drivers/eMPL
+      files:
+        - file: ../../Drivers/eMPL/inv_mpu.c
+        - file: ../../Drivers/eMPL/inv_mpu_dmp_motion_driver.c
+        - file: ../../Drivers/eMPL/MPU6050.c
+        - file: ../../Drivers/eMPL/STM32_I2C.c
     - group: Drivers/STM32F1xx_HAL_Driver
       files:
         - file: ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c
