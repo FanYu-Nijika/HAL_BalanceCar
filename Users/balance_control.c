@@ -52,7 +52,7 @@ volatile float Balance_Kd = 0.35f;
  * Automatically calibrated during boot.
  * Hold the car at its real mechanical balance point when powering on.
  */
-volatile float Balance_Target_Angle = 0.0f;
+volatile float Balance_Target_Angle = 1.0f;
 
 /*
  * Manual fine tuning for mechanical balance point.
