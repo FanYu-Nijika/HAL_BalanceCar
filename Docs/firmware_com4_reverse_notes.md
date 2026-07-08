@@ -44,7 +44,7 @@ Conclusion: the successful firmware runs the fast balance path from PB9 EXTI, no
   - `0x20000088` = `410.0f` (`Velocity_Kp`)
   - `0x2000008c` = `2.0f` (`Velocity_Ki`)
 - `0x08005ed8` divides the angle-loop parameters by `100.0f` before calculating output.
-- `0x08005a5e` uses velocity filtering constants `0.84` and `0.16`, accumulates a velocity integral, and clamps that integral around `+/-380000`.
+- `0x08005a5e` uses velocity filtering constants `0.84` and `0.16`, accumulates a velocity integral, clamps that integral around `+/-380000`, and applies the velocity feedback with negative proportional/integral sign.
 - `0x0800043e-0x08000444` initializes the TIM3 PWM path with period `0x1c1f`, while `0x0800572c` writes CCR values around `0x1c20` (`7200`).
 - `0x0800572c` writes TIM3 CCR1-CCR4 directly:
   - left positive: CCR1 = `7200`, CCR2 = `7200 - output`

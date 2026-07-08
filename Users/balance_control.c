@@ -300,8 +300,8 @@ void balance_control_update(void)
     g_speed_integral += g_speed_filter;
     g_speed_integral = limit_float(g_speed_integral, SPEED_INTEGRAL_LIMIT);
 
-    g_velocity_pwm = (int)(g_speed_filter * (Velocity_Kp / BALANCE_PARAM_SCALE)
-                         + g_speed_integral * (Velocity_Ki / BALANCE_PARAM_SCALE));
+    g_velocity_pwm = (int)(-g_speed_filter * (Velocity_Kp / BALANCE_PARAM_SCALE)
+                         - g_speed_integral * (Velocity_Ki / BALANCE_PARAM_SCALE));
     g_turn_pwm = 0;
 
     final_left = g_balance_pwm + g_velocity_pwm + g_turn_pwm;
