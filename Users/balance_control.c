@@ -6,11 +6,22 @@
 #include <stdio.h>
 
 /*
- * firmware_COM4_verify runs the fast balance path from MPU6050 PB9 EXTI.
- * The verified firmware exposes DMP, Kalman and C F modes. This project keeps
- * the raw-register Kalman path and mirrors the verified cascade PID output.
+ * Verified firmware architecture from COM4/hex reverse notes:
+ *
+ *   MPU6050 data-ready PB9 EXTI fast path
+ *       -> read encoder counts
+ *       -> read raw MPU6050 attitude data
+ *       -> Kalman/complementary pitch estimate
+ *       -> angle PD PWM
+ *       -> velocity PI PWM
+ *       -> left/right PWM mix and limit
+ *
+ * The controller starts automatically after balance_control_init(). It does not
+ * wait for a serial "init" command; the serial port is only for logs/debugging.
  */
 #define BALANCE_DT 0.005f
+#define BALANCE_AUTO_START 1
+
 #define BALANCE_FILTER_ALPHA 0.98f
 #define BALANCE_FILTER_KALMAN 2
 #define BALANCE_FILTER_COMPLEMENTARY 3
@@ -27,13 +38,8 @@
 #define SPEED_FILTER_KEEP 0.84f
 #define SPEED_FILTER_NEW 0.16f
 
-/*
- * Keep the velocity integral below the motor saturation range.
- * With Velocity_Ki / BALANCE_PARAM_SCALE = 0.02, this gives about 1000 PWM
- * of maximum integral contribution instead of allowing the integral alone to
- * saturate the +/-6900 motor output.
- */
-#define SPEED_INTEGRAL_LIMIT 50000.0f
+/* Verified firmware clamps the velocity integral around +/-380000. */
+#define SPEED_INTEGRAL_LIMIT 380000.0f
 
 /*
  * firmware_COM4_verify startup RAM defaults:
@@ -70,26 +76,36 @@ volatile int Balance_Output_Dir = 1;
 volatile int Balance_Left_Motor_Dir = 1;
 volatile int Balance_Right_Motor_Dir = 1;
 
-static float g_balance_angle = 0.0f;
-static float g_accel_angle = 0.0f;
-static float g_balance_gyro_rate = 0.0f;
-static float g_gyro_zero_rate = 0.0f;
-static float g_kalman_bias = 0.0f;
-static float g_kalman_p00 = 0.0f;
-static float g_kalman_p01 = 0.0f;
-static float g_kalman_p10 = 0.0f;
-static float g_kalman_p11 = 0.0f;
-static float g_speed_filter = 0.0f;
-static float g_speed_integral = 0.0f;
+typedef struct
+{
+    float angle;
+    float accel_angle;
+    float gyro_rate;
+    float gyro_zero_rate;
 
-static int g_balance_pwm = 0;
-static int g_velocity_pwm = 0;
-static int g_turn_pwm = 0;
-static int g_left_pwm = 0;
-static int g_right_pwm = 0;
-static int g_left_encoder_count = 0;
-static int g_right_encoder_count = 0;
-static uint8_t g_is_fallen = 1;
+    float kalman_bias;
+    float kalman_p00;
+    float kalman_p01;
+    float kalman_p10;
+    float kalman_p11;
+
+    float speed_filter;
+    float speed_integral;
+
+    int left_encoder_count;
+    int right_encoder_count;
+
+    int balance_pwm;
+    int velocity_pwm;
+    int turn_pwm;
+    int left_pwm;
+    int right_pwm;
+
+    uint8_t enabled;
+    uint8_t is_fallen;
+} balance_runtime_t;
+
+static balance_runtime_t g_balance;
 
 static float abs_float(float value)
 {
@@ -131,33 +147,38 @@ static float limit_float(float value, float limit)
     return value;
 }
 
-static void balance_speed_reset(void)
+static void balance_velocity_loop_reset(void)
 {
-    g_speed_filter = 0.0f;
-    g_speed_integral = 0.0f;
+    g_balance.speed_filter = 0.0f;
+    g_balance.speed_integral = 0.0f;
 }
 
-static void balance_stop(void)
+static void balance_output_reset(void)
 {
-    g_balance_pwm = 0;
-    g_velocity_pwm = 0;
-    g_turn_pwm = 0;
-    g_left_pwm = 0;
-    g_right_pwm = 0;
-    balance_speed_reset();
+    g_balance.balance_pwm = 0;
+    g_balance.velocity_pwm = 0;
+    g_balance.turn_pwm = 0;
+    g_balance.left_pwm = 0;
+    g_balance.right_pwm = 0;
     motor_stop_all();
+}
+
+static void balance_fault_stop(void)
+{
+    balance_velocity_loop_reset();
+    balance_output_reset();
 }
 
 static void balance_filter_reset(float angle)
 {
-    g_balance_angle = angle;
-    g_accel_angle = angle;
-    g_balance_gyro_rate = 0.0f;
-    g_kalman_bias = 0.0f;
-    g_kalman_p00 = 0.0f;
-    g_kalman_p01 = 0.0f;
-    g_kalman_p10 = 0.0f;
-    g_kalman_p11 = 0.0f;
+    g_balance.angle = angle;
+    g_balance.accel_angle = angle;
+    g_balance.gyro_rate = 0.0f;
+    g_balance.kalman_bias = 0.0f;
+    g_balance.kalman_p00 = 0.0f;
+    g_balance.kalman_p01 = 0.0f;
+    g_balance.kalman_p10 = 0.0f;
+    g_balance.kalman_p11 = 0.0f;
 }
 
 static float balance_kalman_update(float accel_angle, float gyro_rate)
@@ -170,35 +191,37 @@ static float balance_kalman_update(float accel_angle, float gyro_rate)
     float k1;
     float y;
 
-    rate = gyro_rate - g_kalman_bias;
-    g_balance_angle += BALANCE_DT * rate;
+    rate = gyro_rate - g_balance.kalman_bias;
+    g_balance.angle += BALANCE_DT * rate;
 
-    g_kalman_p00 += BALANCE_DT * (BALANCE_DT * g_kalman_p11 - g_kalman_p01 - g_kalman_p10 + BALANCE_KALMAN_Q_ANGLE);
-    g_kalman_p01 -= BALANCE_DT * g_kalman_p11;
-    g_kalman_p10 -= BALANCE_DT * g_kalman_p11;
-    g_kalman_p11 += BALANCE_KALMAN_Q_BIAS * BALANCE_DT;
+    g_balance.kalman_p00 += BALANCE_DT * (BALANCE_DT * g_balance.kalman_p11
+                            - g_balance.kalman_p01 - g_balance.kalman_p10
+                            + BALANCE_KALMAN_Q_ANGLE);
+    g_balance.kalman_p01 -= BALANCE_DT * g_balance.kalman_p11;
+    g_balance.kalman_p10 -= BALANCE_DT * g_balance.kalman_p11;
+    g_balance.kalman_p11 += BALANCE_KALMAN_Q_BIAS * BALANCE_DT;
 
-    s = g_kalman_p00 + BALANCE_KALMAN_R_MEASURE;
+    s = g_balance.kalman_p00 + BALANCE_KALMAN_R_MEASURE;
     if (s == 0.0f)
     {
-        return g_balance_angle;
+        return g_balance.angle;
     }
 
-    k0 = g_kalman_p00 / s;
-    k1 = g_kalman_p10 / s;
-    y = accel_angle - g_balance_angle;
+    k0 = g_balance.kalman_p00 / s;
+    k1 = g_balance.kalman_p10 / s;
+    y = accel_angle - g_balance.angle;
 
-    g_balance_angle += k0 * y;
-    g_kalman_bias += k1 * y;
+    g_balance.angle += k0 * y;
+    g_balance.kalman_bias += k1 * y;
 
-    p00_temp = g_kalman_p00;
-    p01_temp = g_kalman_p01;
-    g_kalman_p00 -= k0 * p00_temp;
-    g_kalman_p01 -= k0 * p01_temp;
-    g_kalman_p10 -= k1 * p00_temp;
-    g_kalman_p11 -= k1 * p01_temp;
+    p00_temp = g_balance.kalman_p00;
+    p01_temp = g_balance.kalman_p01;
+    g_balance.kalman_p00 -= k0 * p00_temp;
+    g_balance.kalman_p01 -= k0 * p01_temp;
+    g_balance.kalman_p10 -= k1 * p00_temp;
+    g_balance.kalman_p11 -= k1 * p01_temp;
 
-    return g_balance_angle;
+    return g_balance.angle;
 }
 
 static void balance_calibrate_zero_angle(void)
@@ -225,106 +248,207 @@ static void balance_calibrate_zero_angle(void)
 
     if (samples > 0)
     {
-        g_gyro_zero_rate = gyro_sum / (float)samples;
+        g_balance.gyro_zero_rate = gyro_sum / (float)samples;
         balance_filter_reset(angle_sum / (float)samples);
     }
     else
     {
-        g_gyro_zero_rate = 0.0f;
+        g_balance.gyro_zero_rate = 0.0f;
         balance_filter_reset(Balance_Target_Angle);
     }
 }
 
-void balance_control_init(void)
+static void balance_read_encoder_feedback(void)
 {
-    if (mpu6050_fast_init())
+    /* Verified fast path reads TIM4 first, then TIM8 and negates the right side. */
+    g_balance.left_encoder_count = encoder_read_left_count();
+    g_balance.right_encoder_count = -encoder_read_right_count();
+}
+
+static int balance_read_attitude_feedback(void)
+{
+    mpu6050_fast_data_t data;
+
+    if (!mpu6050_fast_read(&data))
     {
-        balance_calibrate_zero_angle();
+        return 0;
+    }
 
-        g_is_fallen = 0;
+    g_balance.accel_angle = mpu6050_fast_get_pitch_accel(&data);
+    g_balance.gyro_rate = mpu6050_fast_get_pitch_gyro_rate(&data)
+                         - g_balance.gyro_zero_rate;
 
-        printf("[BAL] MPU6050 fast init ok, target_x100=%d, gyro_zero_x100=%d\r\n",
-               (int)(Balance_Target_Angle * 100.0f),
-               (int)(g_gyro_zero_rate * 100.0f));
+    return 1;
+}
+
+static void balance_update_attitude_filter(void)
+{
+    if (Balance_Filter_Mode == BALANCE_FILTER_KALMAN)
+    {
+        g_balance.angle = balance_kalman_update(g_balance.accel_angle,
+                                                g_balance.gyro_rate);
     }
     else
     {
-        g_is_fallen = 1;
-        printf("[BAL] MPU6050 fast init failed, motor stopped\r\n");
+        g_balance.angle = BALANCE_FILTER_ALPHA
+                        * (g_balance.angle + g_balance.gyro_rate * BALANCE_DT)
+                        + (1.0f - BALANCE_FILTER_ALPHA) * g_balance.accel_angle;
+    }
+}
+
+static float balance_get_target_angle(void)
+{
+    return Balance_Target_Angle + Balance_Target_Offset;
+}
+
+static int balance_is_angle_safe(float target_angle)
+{
+    if (abs_float(g_balance.angle - target_angle) > BALANCE_FALL_ANGLE)
+    {
+        return 0;
     }
 
-    balance_stop();
+    return 1;
+}
+
+static void balance_angle_loop_update(float target_angle)
+{
+    float angle_error;
+    float angle_output;
+
+    angle_error = g_balance.angle - target_angle;
+    angle_output = angle_error * (Balance_Kp / BALANCE_PARAM_SCALE)
+                 + g_balance.gyro_rate * (Balance_Kd / BALANCE_PARAM_SCALE);
+
+    g_balance.balance_pwm = (int)(angle_output * (float)Balance_Output_Dir);
+}
+
+static void balance_velocity_loop_update(void)
+{
+    float speed_feedback;
+
+    speed_feedback = -(float)(g_balance.left_encoder_count
+                              + g_balance.right_encoder_count);
+
+    g_balance.speed_filter = g_balance.speed_filter * SPEED_FILTER_KEEP
+                           + speed_feedback * SPEED_FILTER_NEW;
+    g_balance.speed_integral += g_balance.speed_filter;
+    g_balance.speed_integral = limit_float(g_balance.speed_integral,
+                                           SPEED_INTEGRAL_LIMIT);
+
+    /* Verified firmware applies velocity feedback with negative P/I sign. */
+    g_balance.velocity_pwm = (int)(-g_balance.speed_filter
+                                  * (Velocity_Kp / BALANCE_PARAM_SCALE)
+                                  -g_balance.speed_integral
+                                  * (Velocity_Ki / BALANCE_PARAM_SCALE));
+}
+
+static void balance_turn_loop_update(void)
+{
+    /* Verified straight-balance fast path keeps turn output at zero. */
+    g_balance.turn_pwm = 0;
+}
+
+static void balance_mix_and_output(void)
+{
+    int final_left;
+    int final_right;
+
+    final_left = g_balance.balance_pwm + g_balance.velocity_pwm + g_balance.turn_pwm;
+    final_right = g_balance.balance_pwm + g_balance.velocity_pwm - g_balance.turn_pwm;
+
+    g_balance.left_pwm = limit_int(final_left, MOTOR_PWM_MAX);
+    g_balance.right_pwm = limit_int(final_right, MOTOR_PWM_MAX);
+
+    motor_set_left(g_balance.left_pwm * Balance_Left_Motor_Dir);
+    motor_set_right(g_balance.right_pwm * Balance_Right_Motor_Dir);
+}
+
+static void balance_fast_loop_step(void)
+{
+    float target_angle;
+
+    balance_read_encoder_feedback();
+
+    if (!balance_read_attitude_feedback())
+    {
+        g_balance.is_fallen = 1;
+        balance_fault_stop();
+        return;
+    }
+
+    balance_update_attitude_filter();
+    target_angle = balance_get_target_angle();
+
+    if (!balance_is_angle_safe(target_angle))
+    {
+        g_balance.is_fallen = 1;
+        balance_fault_stop();
+        return;
+    }
+
+    g_balance.is_fallen = 0;
+
+    balance_angle_loop_update(target_angle);
+    balance_velocity_loop_update();
+    balance_turn_loop_update();
+    balance_mix_and_output();
+}
+
+void balance_control_init(void)
+{
+    g_balance.enabled = 0;
+    g_balance.is_fallen = 1;
+    balance_velocity_loop_reset();
+    balance_output_reset();
+
+    if (mpu6050_fast_init())
+    {
+        balance_calibrate_zero_angle();
+        balance_velocity_loop_reset();
+        balance_output_reset();
+
+#if BALANCE_AUTO_START
+        g_balance.enabled = 1;
+        g_balance.is_fallen = 0;
+#endif
+
+        printf("[BAL] auto start, target_x100=%d, gyro_zero_x100=%d\r\n",
+               (int)(Balance_Target_Angle * 100.0f),
+               (int)(g_balance.gyro_zero_rate * 100.0f));
+    }
+    else
+    {
+        g_balance.enabled = 0;
+        g_balance.is_fallen = 1;
+        printf("[BAL] MPU6050 fast init failed, motor stopped\r\n");
+    }
+}
+
+void balance_control_start(void)
+{
+    balance_velocity_loop_reset();
+    balance_output_reset();
+    g_balance.enabled = 1;
+    g_balance.is_fallen = 0;
+}
+
+void balance_control_stop(void)
+{
+    g_balance.enabled = 0;
+    g_balance.is_fallen = 1;
+    balance_fault_stop();
 }
 
 void balance_control_update(void)
 {
-    mpu6050_fast_data_t data;
-    float target_angle;
-    float angle_output;
-    float speed_least;
-    int final_left;
-    int final_right;
-
-    /*
-     * firmware_COM4_verify reads and clears TIM4 first, then TIM8 and negates it
-     * at the start of the PB9 EXTI handler before attitude/control calculation.
-     */
-    g_left_encoder_count = encoder_read_left_count();
-    g_right_encoder_count = -encoder_read_right_count();
-
-    if (!mpu6050_fast_read(&data))
+    if (!g_balance.enabled)
     {
-        g_is_fallen = 1;
-        balance_stop();
-
+        balance_output_reset();
         return;
     }
 
-    g_accel_angle = mpu6050_fast_get_pitch_accel(&data);
-    g_balance_gyro_rate = mpu6050_fast_get_pitch_gyro_rate(&data) - g_gyro_zero_rate;
-
-    if (Balance_Filter_Mode == BALANCE_FILTER_KALMAN)
-    {
-        g_balance_angle = balance_kalman_update(g_accel_angle, g_balance_gyro_rate);
-    }
-    else
-    {
-        g_balance_angle = BALANCE_FILTER_ALPHA
-                        * (g_balance_angle + g_balance_gyro_rate * BALANCE_DT)
-                        + (1.0f - BALANCE_FILTER_ALPHA) * g_accel_angle;
-    }
-
-    target_angle = Balance_Target_Angle + Balance_Target_Offset;
-
-    if (abs_float(g_balance_angle - target_angle) > BALANCE_FALL_ANGLE)
-    {
-        g_is_fallen = 1;
-        balance_stop();
-        return;
-    }
-
-    g_is_fallen = 0;
-
-    angle_output = (g_balance_angle - target_angle) * (Balance_Kp / BALANCE_PARAM_SCALE)
-                 + g_balance_gyro_rate * (Balance_Kd / BALANCE_PARAM_SCALE);
-    g_balance_pwm = (int)(angle_output * (float)Balance_Output_Dir);
-
-    speed_least = -(float)(g_left_encoder_count + g_right_encoder_count);
-    g_speed_filter = g_speed_filter * SPEED_FILTER_KEEP + speed_least * SPEED_FILTER_NEW;
-    g_speed_integral += g_speed_filter;
-    g_speed_integral = limit_float(g_speed_integral, SPEED_INTEGRAL_LIMIT);
-
-    g_velocity_pwm = (int)(-g_speed_filter * (Velocity_Kp / BALANCE_PARAM_SCALE)
-                         - g_speed_integral * (Velocity_Ki / BALANCE_PARAM_SCALE));
-    g_turn_pwm = 0;
-
-    final_left = g_balance_pwm + g_velocity_pwm + g_turn_pwm;
-    final_right = g_balance_pwm + g_velocity_pwm - g_turn_pwm;
-    g_left_pwm = limit_int(final_left, MOTOR_PWM_MAX);
-    g_right_pwm = limit_int(final_right, MOTOR_PWM_MAX);
-
-    motor_set_left(g_left_pwm * Balance_Left_Motor_Dir);
-    motor_set_right(g_right_pwm * Balance_Right_Motor_Dir);
+    balance_fast_loop_step();
 }
 
 void balance_control_mpu_irq(void)
@@ -334,30 +458,30 @@ void balance_control_mpu_irq(void)
 
 float balance_control_get_angle(void)
 {
-    return g_balance_angle;
+    return g_balance.angle;
 }
 
 float balance_control_get_gyro_rate(void)
 {
-    return g_balance_gyro_rate;
+    return g_balance.gyro_rate;
 }
 
 int balance_control_get_pwm(void)
 {
-    return g_balance_pwm;
+    return g_balance.balance_pwm;
 }
 
 int balance_control_get_left_pwm(void)
 {
-    return g_left_pwm;
+    return g_balance.left_pwm;
 }
 
 int balance_control_get_right_pwm(void)
 {
-    return g_right_pwm;
+    return g_balance.right_pwm;
 }
 
 uint8_t balance_control_is_fallen(void)
 {
-    return g_is_fallen;
+    return g_balance.is_fallen;
 }
