@@ -9,15 +9,15 @@
 #include <stdio.h>
 
 #define BALANCE_OLED_DEBUG 0
+#define BALANCE_CONTROL_PERIOD_MS 5
 #define BALANCE_DISPLAY_PERIOD_MS 200
 
 void led_init(void);
 
 int main(void)
 {
-#if BALANCE_OLED_DEBUG
     uint32_t now_tick;
-#endif
+    uint32_t last_control_tick;
 
 #if BALANCE_OLED_DEBUG
     uint32_t last_display_tick;
@@ -37,14 +37,30 @@ int main(void)
     encoder_init();
     balance_control_init();
 
+    last_control_tick = HAL_GetTick();
+
 #if BALANCE_OLED_DEBUG
     last_display_tick = HAL_GetTick();
 #endif
 
     while (1)
     {
-#if BALANCE_OLED_DEBUG
         now_tick = HAL_GetTick();
+
+        /*
+         * 5 ms fallback loop.
+         *
+         * The verified firmware runs from the MPU6050 PB9 data-ready interrupt,
+         * but keeping a periodic fallback prevents the car from staying silent
+         * when the INT pin/EXTI path is not firing during bring-up.
+         */
+        if (now_tick - last_control_tick >= BALANCE_CONTROL_PERIOD_MS)
+        {
+            last_control_tick = now_tick;
+            balance_control_update();
+        }
+
+#if BALANCE_OLED_DEBUG
         if (now_tick - last_display_tick >= BALANCE_DISPLAY_PERIOD_MS)
         {
             last_display_tick = now_tick;
@@ -57,10 +73,7 @@ int main(void)
             OLED_Printf(64, 32, OLED_6X8, "R:%d", balance_control_get_right_pwm());
             OLED_Update();
         }
-#else
-        __WFI();
 #endif
-
     }
 }
 
@@ -79,5 +92,4 @@ void led_init(void)
 
     gpio_initstruct.Pin = GPIO_PIN_5;
     HAL_GPIO_Init(GPIOE, &gpio_initstruct);
-    
 }
