@@ -26,7 +26,14 @@
 #define BALANCE_PARAM_SCALE 100.0f
 #define SPEED_FILTER_KEEP 0.84f
 #define SPEED_FILTER_NEW 0.16f
-#define SPEED_INTEGRAL_LIMIT 380000.0f
+
+/*
+ * Keep the velocity integral below the motor saturation range.
+ * With Velocity_Ki / BALANCE_PARAM_SCALE = 0.02, this gives about 1000 PWM
+ * of maximum integral contribution instead of allowing the integral alone to
+ * saturate the +/-6900 motor output.
+ */
+#define SPEED_INTEGRAL_LIMIT 50000.0f
 
 /*
  * firmware_COM4_verify startup RAM defaults:
@@ -124,6 +131,12 @@ static float limit_float(float value, float limit)
     return value;
 }
 
+static void balance_speed_reset(void)
+{
+    g_speed_filter = 0.0f;
+    g_speed_integral = 0.0f;
+}
+
 static void balance_stop(void)
 {
     g_balance_pwm = 0;
@@ -131,6 +144,7 @@ static void balance_stop(void)
     g_turn_pwm = 0;
     g_left_pwm = 0;
     g_right_pwm = 0;
+    balance_speed_reset();
     motor_stop_all();
 }
 
