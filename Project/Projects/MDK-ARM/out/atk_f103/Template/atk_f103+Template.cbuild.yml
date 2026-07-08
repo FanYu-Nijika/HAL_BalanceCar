@@ -1,0 +1,168 @@
+build:
+  generated-by: csolution version 2.14.1+p9-g859cb6c9
+  solution: ../../../atk_f103.csolution.yml
+  project: ../../../atk_f103.cproject.yml
+  context: atk_f103+Template
+  compiler: AC6@6.24.0
+  device: STMicroelectronics::STM32F103RC
+  device-pack: Keil::STM32F1xx_DFP@2.4.1
+  device-books:
+    - name: ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1/Documents/CD00191185.pdf
+      title: STM32F103xC STM32F103xD STM32F103xE Data Sheet
+    - name: ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1/Documents/CD00171190.pdf
+      title: STM32F101xx, STM32F102xx, STM32F103xx, STM32F105xx, STM32F107xx Reference Manual
+    - name: ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1/Documents/dui0552a_cortex_m3_dgug.pdf
+      title: Cortex-M3 Generic User Guide
+  dbgconf:
+    - file: ../../../.cmsis/atk_f103+Template.dbgconf
+      version: 1.0.0
+  processor:
+    endian: little
+    fpu: off
+    core: Cortex-M3
+  packs:
+    - pack: Keil::STM32F1xx_DFP@2.4.1
+      path: ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1
+  optimize: debug
+  debug: on
+  misc:
+    ASM:
+      - -masm=auto
+    C:
+      - -std=c99
+      - -fno-rtti
+      - -funsigned-char
+      - -fshort-enums
+      - -fshort-wchar
+      - -ffunction-sections
+      - -Wno-packed
+      - -Wno-missing-variable-declarations
+      - -Wno-missing-prototypes
+      - -Wno-missing-noreturn
+      - -Wno-sign-conversion
+      - -Wno-nonportable-include-path
+      - -Wno-reserved-id-macro
+      - -Wno-unused-macros
+      - -Wno-documentation-unknown-command
+      - -Wno-documentation
+      - -Wno-license-management
+      - -Wno-parentheses-equality
+    CPP:
+      - -xc++
+      - -std=c++11
+      - -fno-exceptions
+      - -fno-rtti
+      - -funsigned-char
+      - -fshort-enums
+      - -fshort-wchar
+      - -ffunction-sections
+      - -Wno-packed
+      - -Wno-missing-variable-declarations
+      - -Wno-missing-prototypes
+      - -Wno-missing-noreturn
+      - -Wno-sign-conversion
+      - -Wno-nonportable-include-path
+      - -Wno-reserved-id-macro
+      - -Wno-unused-macros
+      - -Wno-documentation-unknown-command
+      - -Wno-documentation
+      - -Wno-license-management
+      - -Wno-parentheses-equality
+    Link:
+      - --map
+      - --load_addr_map_info
+      - --xref
+      - --callgraph
+      - --symbols
+      - --info sizes
+      - --info totals
+      - --info unused
+      - --info veneers
+      - --strict
+      - --summary_stderr
+      - --info summarysizes
+  define:
+    - USE_HAL_DRIVER
+    - STM32F103xE
+    - STM32F10X_HD
+  define-asm:
+    - STM32F10X_HD
+  add-path:
+    - ../../../../../Drivers/CMSIS/Device/ST/STM32F1xx/Include
+    - ../../../../../Drivers/STM32F1xx_HAL_Driver/Inc
+    - ../../../../../Drivers/CMSIS/Include
+    - ../../../../../Drivers
+    - ../../../../../Users
+    - ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1/Device/Include
+  add-path-asm:
+    - ${CMSIS_PACK_ROOT}/Keil/STM32F1xx_DFP/2.4.1/Device/Include
+  output-dirs:
+    intdir: ../../../tmp
+    outdir: .
+    rtedir: ../../../RTE
+  output:
+    - type: elf
+      file: atk_f103.axf
+    - type: comp-db
+      file: compile_commands.json
+    - type: comp-db
+      file: compile_macros.h
+  linker:
+    script: ../../../atk_f103_Template.sct
+  groups:
+    - group: Startup
+      files:
+        - file: ../../../../../Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/arm/startup_stm32f103xe.s
+          category: sourceAsm
+    - group: User
+      files:
+        - file: ../../../../../Users/stm32f1xx_it.c
+          category: sourceC
+        - file: ../../../../../Users/main.c
+          category: sourceC
+        - file: ../../../../../Users/balance_control.c
+          category: sourceC
+        - file: ../../../../../Users/kalman.c
+          category: sourceC
+        - file: ../../../../../Users/pid.c
+          category: sourceC
+        - file: ../../../../../Users/motor.c
+          category: sourceC
+        - file: ../../../../../Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
+          category: sourceC
+    - group: Drivers/SYSTEM
+      files:
+        - file: ../../../../../Drivers/SYSTEM/sys/sys.c
+          category: sourceC
+        - file: ../../../../../Drivers/SYSTEM/delay/delay.c
+          category: sourceC
+        - file: ../../../../../Drivers/SYSTEM/usart/usart.c
+          category: sourceC
+    - group: Drivers/STM32F1xx_HAL_Driver
+      files:
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_dma.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_usart.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c
+          category: sourceC
+        - file: ../../../../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c
+          category: sourceC
+  licenses:
+    - license: <unknown>
+      packs:
+        - pack: Keil::STM32F1xx_DFP@2.4.1

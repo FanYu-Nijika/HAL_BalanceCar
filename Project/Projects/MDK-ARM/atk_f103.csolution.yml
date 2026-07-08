@@ -1,0 +1,10 @@
+solution:
+  created-by: uv2csolution@1.6.0
+  created-for: CMSIS-Toolbox@2.7.0
+  compiler: AC6@6.24.0
+  target-types:
+    - type: Template
+      device: STM32F103RC
+      optimize: debug
+  projects:
+    - project: atk_f103.cproject.yml

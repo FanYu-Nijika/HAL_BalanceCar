@@ -1,0 +1,64 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.log
+.vscode/
+.idea/
+
+# Generic build artifacts
+# build/
+# dist/
+# Debug/
+# Release/
+# *.o
+# *.obj
+# *.elf
+# *.axf
+# *.out
+# *.bin
+*.hex
+# *.map
+# *.d
+# *.lst
+# *.dep
+
+# Keil MDK-ARM
+*.uvoptx
+*.uvguix.*
+*.bak
+*.crf
+*.lnp
+*.plg
+*.htm
+*.i
+*.ii
+*.sbr
+*.sdf
+*.opensdf
+*.db
+*.opendb
+
+# ARM / CMSIS tool temp
+*.su
+*.idb
+*.ilk
+*.pdb
+
+# Project output folders
+Output/
+Project/Output/
+Projects/MDK-ARM/RTE/
+
+# CMake / Ninja (if used later)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+build.ninja
+
+# Python caches (if scripts are added)
+__pycache__/
+*.pyc

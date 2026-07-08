@@ -1,0 +1,16 @@
+build-idx:
+  generated-by: csolution version 2.14.1+p9-g859cb6c9
+  csolution: atk_f103.csolution.yml
+  tmpdir: tmp
+  cprojects:
+    - cproject: atk_f103.cproject.yml
+  cbuilds:
+    - cbuild: out/atk_f103/Template/atk_f103+Template.cbuild.yml
+      project: atk_f103
+      configuration: +Template
+      messages:
+        errors:
+          - file 'D:/10385/Desktop/HAL_BalanceCar/Projects/MDK-ARM/atk_f103_Template.sct' was not found
+        info:
+          - atk_f103.cbuild-pack.yml - file is already up-to-date
+          - atk_f103+Template.cbuild.yml - file is already up-to-date
