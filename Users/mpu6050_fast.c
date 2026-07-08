@@ -9,6 +9,9 @@
 #define MPU6050_CONFIG      0x1A
 #define MPU6050_GYRO_CONFIG 0x1B
 #define MPU6050_ACCEL_CONFIG 0x1C
+#define MPU6050_INT_PIN_CFG  0x37
+#define MPU6050_INT_ENABLE   0x38
+#define MPU6050_INT_STATUS   0x3A
 #define MPU6050_ACCEL_XOUT_H 0x3B
 #define MPU6050_PWR_MGMT_1  0x6B
 #define MPU6050_PWR_MGMT_2  0x6C
@@ -16,6 +19,23 @@
 
 #define MPU6050_RAD_TO_DEG 57.29578f
 #define MPU6050_GYRO_LSB_PER_DPS 16.4f
+
+static void mpu6050_int_gpio_init(void)
+{
+    GPIO_InitTypeDef gpio;
+
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_AFIO_CLK_ENABLE();
+
+    gpio.Pin = MPU6050_INT_Pin;
+    gpio.Mode = GPIO_MODE_IT_FALLING;
+    gpio.Pull = GPIO_PULLUP;
+    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(MPU6050_INT_GPIO_Port, &gpio);
+
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+}
 
 static int16_t make_i16(uint8_t high, uint8_t low)
 {
@@ -44,13 +64,21 @@ int mpu6050_fast_init(void)
     i2cWrite(MPU6050_ADDR, MPU6050_PWR_MGMT_1, 0x01);
     i2cWrite(MPU6050_ADDR, MPU6050_PWR_MGMT_2, 0x00);
 
-    /* DLPF enabled: gyro output is 1kHz. Divider 4 gives 200Hz raw samples. */
-    i2cWrite(MPU6050_ADDR, MPU6050_SMPLRT_DIV, 0x04);
+    /* The verified firmware runs the balance path from MPU data-ready EXTI at 100Hz. */
+    i2cWrite(MPU6050_ADDR, MPU6050_SMPLRT_DIV, 0x09);
     i2cWrite(MPU6050_ADDR, MPU6050_CONFIG, 0x03);
 
     /* Gyro +/-2000dps -> 16.4 LSB/(deg/s), accel +/-4g -> 8192 LSB/g. */
     i2cWrite(MPU6050_ADDR, MPU6050_GYRO_CONFIG, 0x18);
     i2cWrite(MPU6050_ADDR, MPU6050_ACCEL_CONFIG, 0x08);
+
+    /*
+     * firmware_COM4_verify checks PB9 low inside EXTI9_5, so configure the
+     * MPU data-ready interrupt as active-low and trigger the MCU on falling edge.
+     */
+    i2cWrite(MPU6050_ADDR, MPU6050_INT_PIN_CFG, 0x80);
+    i2cWrite(MPU6050_ADDR, MPU6050_INT_ENABLE, 0x01);
+    mpu6050_int_gpio_init();
 
     HAL_Delay(20);
     return 1;
@@ -77,6 +105,18 @@ int mpu6050_fast_read(mpu6050_fast_data_t *data)
     data->gz = make_i16(buf[12], buf[13]);
 
     return 1;
+}
+
+int mpu6050_fast_data_ready(void)
+{
+    uint8_t status = 0;
+
+    if (!i2cRead(MPU6050_ADDR, MPU6050_INT_STATUS, 1, &status))
+    {
+        return 0;
+    }
+
+    return (status & 0x01) ? 1 : 0;
 }
 
 float mpu6050_fast_get_pitch_accel(const mpu6050_fast_data_t *data)

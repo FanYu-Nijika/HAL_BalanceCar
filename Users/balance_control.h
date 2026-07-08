@@ -13,6 +13,7 @@ extern volatile int Balance_Right_Motor_Dir;
 
 void balance_control_init(void);
 void balance_control_update(void);
+void balance_control_mpu_irq(void);
 float balance_control_get_angle(void);
 float balance_control_get_gyro_rate(void);
 int balance_control_get_pwm(void);

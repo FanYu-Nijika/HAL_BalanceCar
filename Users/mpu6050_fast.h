@@ -15,6 +15,7 @@ typedef struct
 
 int mpu6050_fast_init(void);
 int mpu6050_fast_read(mpu6050_fast_data_t *data);
+int mpu6050_fast_data_ready(void);
 float mpu6050_fast_get_pitch_accel(const mpu6050_fast_data_t *data);
 float mpu6050_fast_get_pitch_gyro_rate(const mpu6050_fast_data_t *data);
 

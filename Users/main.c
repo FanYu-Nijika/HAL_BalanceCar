@@ -8,7 +8,6 @@
 #include "balance_control.h"
 #include <stdio.h>
 
-#define BALANCE_CONTROL_PERIOD_MS 5
 #define BALANCE_OLED_DEBUG 0
 #define BALANCE_DISPLAY_PERIOD_MS 200
 
@@ -16,8 +15,9 @@ void led_init(void);
 
 int main(void)
 {
+#if BALANCE_OLED_DEBUG
     uint32_t now_tick;
-    uint32_t last_control_tick;
+#endif
 
 #if BALANCE_OLED_DEBUG
     uint32_t last_display_tick;
@@ -36,22 +36,15 @@ int main(void)
     motor_init();
     encoder_init();
     balance_control_init();
-    last_control_tick = HAL_GetTick();
 
 #if BALANCE_OLED_DEBUG
-    last_display_tick = last_control_tick;
+    last_display_tick = HAL_GetTick();
 #endif
 
     while (1)
     {
-        now_tick = HAL_GetTick();
-        if (now_tick - last_control_tick >= BALANCE_CONTROL_PERIOD_MS)
-        {
-            last_control_tick += BALANCE_CONTROL_PERIOD_MS;
-            balance_control_update();
-        }
-
 #if BALANCE_OLED_DEBUG
+        now_tick = HAL_GetTick();
         if (now_tick - last_display_tick >= BALANCE_DISPLAY_PERIOD_MS)
         {
             last_display_tick = now_tick;
@@ -64,6 +57,8 @@ int main(void)
             OLED_ShowSignedNum(64, 32, balance_control_is_fallen(), 1, OLED_8X16);
             OLED_Update();
         }
+#else
+        __WFI();
 #endif
 
     }

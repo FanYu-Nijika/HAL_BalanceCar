@@ -23,6 +23,8 @@
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_it.h"
 #include "./SYSTEM/sys/sys.h"
+#include "balance_control.h"
+#include "main.h"
    
 /** @addtogroup STM32F1xx_HAL_Examples
   * @{
@@ -140,6 +142,22 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   HAL_IncTick();
+}
+
+void EXTI9_5_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(MPU6050_INT_Pin);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == MPU6050_INT_Pin)
+  {
+    if (HAL_GPIO_ReadPin(MPU6050_INT_GPIO_Port, MPU6050_INT_Pin) == GPIO_PIN_RESET)
+    {
+      balance_control_mpu_irq();
+    }
+  }
 }
 
 /******************************************************************************/

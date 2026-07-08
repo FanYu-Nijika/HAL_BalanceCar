@@ -21,8 +21,8 @@
  * Your motor dead zone:
  * PWM around 55 is still static, around 60 can start moving.
  */
-#define BALANCE_PWM_LIMIT 90
-#define BALANCE_PWM_START 30
+#define BALANCE_PWM_LIMIT 70
+#define BALANCE_PWM_START 40
 
 /*
  * This is not PWM deadband.
@@ -34,8 +34,6 @@
  */
 #define BALANCE_OUTPUT_ZERO 4.0f
 #define BALANCE_PWM_SCALE 0.8f
-
-#define BALANCE_READ_FAIL_PRINT_INTERVAL 100
 
 /*
  * Tuning entry.
@@ -81,7 +79,6 @@ static float g_gyro_zero_rate = 0.0f;
 
 static int g_balance_pwm = 0;
 static uint8_t g_is_fallen = 1;
-static uint16_t g_read_fail_count = 0;
 
 static float abs_float(float value)
 {
@@ -225,17 +222,8 @@ void balance_control_update(void)
         g_is_fallen = 1;
         balance_stop();
 
-        g_read_fail_count++;
-        if (g_read_fail_count >= BALANCE_READ_FAIL_PRINT_INTERVAL)
-        {
-            g_read_fail_count = 0;
-            printf("[BAL] MPU6050 read failed, motor stopped\r\n");
-        }
-
         return;
     }
-
-    g_read_fail_count = 0;
 
     g_accel_angle = mpu6050_fast_get_pitch_accel(&data);
     g_balance_gyro_rate = mpu6050_fast_get_pitch_gyro_rate(&data) - g_gyro_zero_rate;
@@ -271,6 +259,11 @@ void balance_control_update(void)
 
     motor_set_left(g_balance_pwm * Balance_Left_Motor_Dir);
     motor_set_right(g_balance_pwm * Balance_Right_Motor_Dir);
+}
+
+void balance_control_mpu_irq(void)
+{
+    balance_control_update();
 }
 
 float balance_control_get_angle(void)

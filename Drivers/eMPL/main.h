@@ -14,4 +14,7 @@
 #define I2C_SCL_GPIO_Port        GPIOB
 #define I2C_GPIO_CLK_ENABLE()    do{ __HAL_RCC_GPIOB_CLK_ENABLE(); }while(0)
 
+#define MPU6050_INT_Pin          GPIO_PIN_9
+#define MPU6050_INT_GPIO_Port    GPIOB
+
 #endif /* __MAIN_H */
